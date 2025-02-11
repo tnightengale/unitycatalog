@@ -10,12 +10,16 @@ on:
     branches:
       - main
 
-env:
-  IMAGE: ${{ github.repository }} # eg. unitycatalog/unitycatalog
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - context: .
+            name: ${{ github.repository }} # unitycatalog/unitycatalog
+          - context: ./ui
+            name: ${{ github.repository }}-ui # unitycatalog/unitycatalog-ui
 
     steps:
       - name: Checkout repository
@@ -31,7 +35,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ matrix.image.name }}
 
       # TODO: Agree on a strategy for publishing to DockerHub
       # - name: Login to Docker Hub
@@ -43,13 +47,15 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          push: false # TODO: When we are ready to publish, change this to: ${{ github.event_name != 'pull_request' }}
+          context: ${{ matrix.image.context }}
+          # Push only tagged releases to registry.
+          # Eg. the git ref "refs/tags/v0.2.0" would result
+          # in the tagged image "unitycatalog/unitycatalog:v0.2.0".
+          # See here for details: https://tinyurl.com/yh8252m2
+          push: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-          # TODO: Agree on a caching strategy
-          # NOTE: See here for an explanation of registry caching: https://tinyurl.com/4b8mfexr
-          # cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          # cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          # Use registry caching: https://tinyurl.com/4b8mfexr
+          cache-from: type=registry,ref=${{ matrix.image.name }}:buildcache
+          cache-to: type=registry,ref=${{ matrix.image.name }}:buildcache,mode=max

@@ -19,11 +19,14 @@ services:
     build:
       context: ui/
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    network_mode: host
+      # args:
+        # PROXY_HOST: "" # Used for docker network ui with the server
+    # ports:
+    #   - "3000:3000"
     depends_on:
       - server
-      
+
 volumes:
   # Persist docker volume across container restarts
   unitycatalog_data:
